@@ -1,0 +1,210 @@
+---
+title: "ExperimentalDesign"
+author: "Bin Li"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Objectives of the Experiment
+
+The objective of the experiment is to investigate the effects of dry yeast amount on dough rising. This idea comes from our daily impression and life experience that the amount of yeast generally has a positive impact on dough rising. By setting the null hypothesis of equal means of different levels of yeast, we try to discover the detailed relation, if any.
+
+# Experiment Design Details
+
+**Treatment Factors**    
+Treatments: four levels of dry yeast amount (1/8 teaspoon, ¼ teaspoon, ½ teaspoon, and 1 teaspoon).
+<br>
+
+**Experimental Units**  
+Experimental units: shares of dough, each contains 100g flour and 55g water.
+<br>
+
+**Blocking Factor**    
+Blocking factor: experimenters in different location due to the pandemic.
+<br>
+
+**Response Measurements**  
+Response Variable: diameter of the dough
+<br>
+
+**Model**
+<center>
+
+$Y_{ijk}$ = $\mu$ + $\tau_{i}$ + $\beta_{j}$ + $\epsilon_{ijk}$
+
+</center>
+
+
+where $Y_{ijk}$ is the response, diameter of the dough after rising  
+      $\mu$ is the overall mean  
+      $\tau_{i}$ is the treatment effects  
+      $\beta_{j}$ is block effect    
+      $\epsilon_{ijk}$ is the normal error terms  
+
+
+**Pilot Study and Power Analysis**  
+
+In this experiment, experimenters pre-determined and followed the fundamental rule of randomization in the assignment of experimental units to the treatments to avoid bias and confounding. Power analysis determined the sample size n=4, meaning 4 observations per treatment per block (treatment-block combination), therefore each experimenter performed 4*4 individual sub-experiments. The randomization within each block is considered in two aspects.
+
+<br>
+
+# Analysis 
+
+## Hypotheses
+<center>
+
+$H_{0}$: $\tau_{1}$ = $\tau_{2}$ = $\tau_{3}$ = $\tau_{4}$
+$H_{a}$: At leaset two $\tau_{i}$ differ.
+
+</center>
+
+## Test
+**Read data**
+```{r message=FALSE}
+library(tidyverse)
+doughrising = read.csv("/Volumes/LI/MU/STA566/Project/DoughRising.csv", head = TRUE)
+head(doughrising)
+doughrising = doughrising %>% 
+  mutate(Block = factor(Block),
+         Treatment = factor(Treatment))
+```
+
+### Summary Statistics 
+
+(1) Response variable grouped by Treatment groups  
+<br>
+For the treatment output, we can see the mean diameter is increasing as the amount of yeast goes up. The variance in the middle two groups is smaller than the other two. We might need to check the variance in the model assumption section.  
+<br>
+
+```{r message = FALSE}
+library(dplyr)
+doughrising %>% group_by(Treatment) %>% 
+  summarise(N = n(),
+            Mean = mean(Diameter),
+            SD= sd(Diameter),
+            Min = min(Diameter),
+            Max = max(Diameter))
+```
+<br>
+
+(2) Response variable grouped by Block  
+<br>
+The mean diameters in the blocks are very similar. The variance is a little bit different.   
+<br>
+```{r message=FALSE}
+doughrising %>% group_by(Block) %>% 
+  summarise(N = n(),
+            Mean = mean(Diameter),
+            SD= sd(Diameter),
+            Min = min(Diameter),
+            Max = max(Diameter))
+```
+<br>
+
+(3) Boxplots   
+<br>
+The boxplots correspond to the summary statistics above. In the first boxplot, a clear positive relationship can be observed between treatment and diameter. The second one shows the block factor: the mean and median of the two blocks are very similar, and difference in variance is identified.    
+<br>
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+ggplot(aes(x = Treatment, y = Diameter), data = doughrising) +
+  geom_boxplot() +
+  labs(title = "Boxplot for Diameter Grouped by Treatment") +
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="red", fill="red") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+<br>
+
+
+```{r message=FALSE, warning=FALSE}
+ggplot(aes(x = Block, y = Diameter), data = doughrising) +
+  geom_boxplot() +
+  labs(title = "Boxplot for Diameter Grouped by Block Factor") +
+  stat_summary(fun.y=mean, geom="point", shape=20, size=5, color="red", fill="red") +
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5)) 
+  
+```
+<br>
+
+### ANOVA Test  
+<br>
+From the ANOVA table, we can see that the P-value of our treatment factor is very small, indicating we need to reject our null hypothesis of equal treatment effects. In fact, results indicate that the amount of dry yeast does affect the diameter/size of the rising dough. At the same time, the table tells us that the block factor is not significant thus we do not need to worry about it.  
+<br>
+
+```{r message=FALSE}
+aov.fit = aov(Diameter ~ Treatment + Block, data = doughrising)
+summary(aov.fit)
+```
+<br>
+
+### Multiple Comparison  
+<br>
+The results of multiple comparison adjusted by Tukey’s Method is shown below. The estimate of differences of least square means between 1⁄2 teaspoon and 1⁄4 teaspoon groups is small and the large p-value suggests that this pair is not significantly different, whereas all of the other pair-wise comparisons are significant with small p-values.  
+<br>
+
+```{r message=FALSE}
+TukeyHSD(aov.fit)
+```
+<br>
+
+### Checking Model Assumption
+
+(1) Constant Variance  
+<br>
+Residuals do not seem to vary with respect to the predicted mean, thus the constant variance assumption is not violated.  
+<br>
+```{r message=FALSE}
+library(car)
+plot(aov.fit,1)
+leveneTest(Diameter ~ Treatment , data = doughrising)
+```
+<br>
+
+(2) Normality  
+<br>
+The residual points on the Normal QQ-plot lies away the straight line, and Shapiro-wilk test indicates normality assumption is problematic as well. That might result from small sample size.
+<br>
+
+```{r message=FALSE}
+plot(aov.fit, 2)
+# Extract the residuals
+aov.residuals <- residuals(object = aov.fit )
+# Run Shapiro-Wilk test
+shapiro.test(x = aov.residuals )
+```
+<br>
+
+(3) Linearity  
+<br>
+No distinct pattern is identified in the residual vs. predicted mean, linearity holds. 
+<br>
+
+(4) Outliers  
+<br>
+All residuals are distributed within ±3 SD, and there is no evident outlier. 
+<br>
+
+(5) Independence  
+<br>
+Independence is Guaranteed by the design of the experiment.  
+<br>
+
+## Conclusion
+<br>
+Based on the statistical analysis, we conclude that the amount of dry yeast affects the diameter/size of rising dough. Under our experiment conditions (100g flour and 55g water), although the statistical difference between the diameter of the rising dough of 1⁄4 tsp yeast and 1⁄2 tsp group is not identified, all other groups have significant differences. From the boxplots, there seems to be a positive relationship between the amount of yeast and the diameter. The detailed relationship between the two is subject to further analysis.
+<br>
+<br>
+<br>
+
+# Note
+
+This is a course project done by Bin Li and Wen Pan. 
+<br>
+<br>
+<br>
+
